@@ -1,7 +1,23 @@
 import { Link } from "react-router-dom";
 import { Phone, Mail, MapPin, Clock } from "lucide-react";
+import { useBootstrap } from "@/hooks/use-bootstrap";
 
 const Footer = () => {
+  const { data } = useBootstrap();
+  const site = data?.site;
+  const navigation = data?.navigation;
+  const footerLinks = navigation?.footerLinks?.length
+    ? navigation.footerLinks
+    : [
+        { label: "Shop", to: "/shop" },
+        { label: "Categories", to: "/shop" },
+        { label: "Upload Prescription", to: "/upload-prescription" },
+        { label: "How It Works", to: "/how-it-works" },
+        { label: "FAQ", to: "/faq" },
+        { label: "Contact", to: "/contact" },
+      ];
+  const policyLinks = navigation?.policyLinks || [];
+
   return (
     <footer className="border-t border-border bg-foreground text-primary-foreground">
       <div className="container py-12">
@@ -10,13 +26,12 @@ const Footer = () => {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="text-sm font-bold text-primary-foreground">M</span>
+                <span className="text-sm font-bold text-primary-foreground">{site?.logoLetter || "M"}</span>
               </div>
-              <span className="font-heading text-lg font-bold">MedServe Ghana</span>
+              <span className="font-heading text-lg font-bold">{site?.brandName || "MedServe Ghana"}</span>
             </div>
             <p className="text-sm leading-relaxed opacity-80">
-              Ghana's trusted online pharmacy. We provide genuine medicines, pharmacist-reviewed prescriptions, 
-              and convenient delivery to your doorstep. Licensed and committed to your health.
+              {site?.tagline || "Online pharmacy support for everyday health and pharmacist-reviewed prescriptions."}
             </p>
           </div>
 
@@ -26,14 +41,8 @@ const Footer = () => {
               Quick Links
             </h4>
             <ul className="space-y-2 text-sm">
-              {[
-                { label: "Shop Medicines", to: "/shop" },
-                { label: "Upload Prescription", to: "/upload-prescription" },
-                { label: "How It Works", to: "/how-it-works" },
-                { label: "FAQ", to: "/faq" },
-                { label: "Contact Us", to: "/contact" },
-              ].map((link) => (
-                <li key={link.to}>
+              {footerLinks.map((link, index) => (
+                <li key={`${link.label}-${link.to}-${index}`}>
                   <Link to={link.to} className="opacity-80 transition-opacity hover:opacity-100">
                     {link.label}
                   </Link>
@@ -48,17 +57,11 @@ const Footer = () => {
               Policies
             </h4>
             <ul className="space-y-2 text-sm">
-              {[
-                "Privacy Policy",
-                "Terms of Service",
-                "Return Policy",
-                "Delivery Information",
-                "Prescription Policy",
-              ].map((label) => (
-                <li key={label}>
-                  <span className="cursor-pointer opacity-80 transition-opacity hover:opacity-100">
-                    {label}
-                  </span>
+              {policyLinks.map((link, index) => (
+                <li key={`${link.label}-${link.to}-${index}`}>
+                  <Link to={link.to} className="opacity-80 transition-opacity hover:opacity-100">
+                    {link.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -72,26 +75,26 @@ const Footer = () => {
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-2">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                <span className="opacity-80">+233 30 123 4567</span>
+                <span className="opacity-80">{site?.supportPhone?.join(" / ") || ""}</span>
               </li>
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                <span className="opacity-80">support@medserveghana.com</span>
+                <span className="opacity-80">{site?.supportEmail || ""}</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                <span className="opacity-80">Accra, Ghana</span>
+                <span className="opacity-80">{site?.address || ""}</span>
               </li>
               <li className="flex items-start gap-2">
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 opacity-60" />
-                <span className="opacity-80">Mon to Sat: 8:00 AM to 8:00 PM</span>
+                <span className="opacity-80">{site?.businessHours?.[0] || ""}</span>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-10 border-t border-primary-foreground/10 pt-6 text-center text-xs opacity-60">
-          &copy; {new Date().getFullYear()} MedServe Ghana. All rights reserved. Licensed Pharmacy.
+          &copy; {new Date().getFullYear()} {site?.brandName || "MedServe Ghana"}. All rights reserved.
         </div>
       </div>
     </footer>

@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +23,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local backend runtime data
+backend/storage/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Uploaded files and generated assets
+uploads/
+backend/uploads/
+
+# Local OS and temp files
+Thumbs.db
+*.tmp
+*.temp

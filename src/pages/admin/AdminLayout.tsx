@@ -1,65 +1,68 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard, Package, Tag, ShoppingCart, FileText,
-  Users, Warehouse, PenSquare, HelpCircle, Home,
-  Settings, UserCog, BarChart3,
-} from "lucide-react";
+import { BarChart3, FileText, Home, LayoutDashboard, Package, PenSquare, Settings, ShoppingCart, Tag, UserCog, Users, Warehouse } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { hasPermission } from "@/lib/permissions";
 
-const adminNav = [
-  { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-  { label: "Products", to: "/admin/products", icon: Package },
-  { label: "Categories", to: "/admin/categories", icon: Tag },
-  { label: "Orders", to: "/admin/orders", icon: ShoppingCart },
-  { label: "Prescriptions", to: "/admin/prescriptions", icon: FileText },
-  { label: "Customers", to: "/admin/customers", icon: Users },
-  { label: "Inventory", to: "/admin/inventory", icon: Warehouse },
-  { label: "Content", to: "/admin/content", icon: PenSquare },
-  { label: "FAQ", to: "/admin/faq", icon: HelpCircle },
-  { label: "Homepage", to: "/admin/homepage", icon: Home },
-  { label: "Settings", to: "/admin/settings", icon: Settings },
-  { label: "Users and Roles", to: "/admin/users", icon: UserCog },
-  { label: "Reports", to: "/admin/reports", icon: BarChart3 },
+const navItems = [
+  { label: "Dashboard", to: "/admin", icon: LayoutDashboard, permission: "dashboard.view" },
+  { label: "Products", to: "/admin/products", icon: Package, permission: "products.view" },
+  { label: "Categories", to: "/admin/categories", icon: Tag, permission: "categories.view" },
+  { label: "Orders", to: "/admin/orders", icon: ShoppingCart, permission: "orders.view" },
+  { label: "Prescriptions", to: "/admin/prescriptions", icon: FileText, permission: "prescriptions.view" },
+  { label: "Customers", to: "/admin/customers", icon: Users, permission: "customers.view" },
+  { label: "Inventory", to: "/admin/inventory", icon: Warehouse, permission: "inventory.view" },
+  { label: "Content", to: "/admin/content", icon: PenSquare, permission: "content.view" },
+  { label: "Homepage", to: "/admin/homepage", icon: Home, permission: "content.view" },
+  { label: "FAQ", to: "/admin/faq", icon: FileText, permission: "content.view" },
+  { label: "Settings", to: "/admin/settings", icon: Settings, permission: "content.view" },
+  { label: "Users and Roles", to: "/admin/users", icon: UserCog, permission: "users.view" },
+  { label: "Reports", to: "/admin/reports", icon: BarChart3, permission: "reports.view" },
 ];
 
-const AdminLayout = () => {
+export default function AdminLayout() {
   const location = useLocation();
+  const { logout, user } = useAuth();
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-60 shrink-0 border-r border-border bg-card lg:block">
-        <div className="flex h-14 items-center border-b border-border px-4">
-          <Link to="/admin" className="font-heading text-lg font-bold text-foreground">
-            MedServe <span className="text-primary">Admin</span>
-          </Link>
-        </div>
-        <nav className="space-y-0.5 p-3">
-          {adminNav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                location.pathname === item.to
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1">
-        <div className="flex h-14 items-center justify-between border-b border-border bg-card px-6">
-          <span className="text-sm text-muted-foreground">Admin Panel</span>
-          <Link to="/" className="text-sm text-primary hover:underline">View Site</Link>
-        </div>
-        <div className="p-6">
-          <Outlet />
+    <div className="min-h-screen bg-background">
+      <div className="grid min-h-screen lg:grid-cols-[260px_1fr]">
+        <aside className="border-r border-border bg-card p-4">
+          <div className="rounded-3xl bg-primary px-4 py-5 text-primary-foreground">
+            <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/70">MedServe Ghana</p>
+            <h1 className="mt-2 text-2xl font-bold">Admin Console</h1>
+          </div>
+          <nav className="mt-6 space-y-1">
+            {navItems.filter((item) => hasPermission(user?.role, item.permission)).map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm ${location.pathname === item.to ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </aside>
+
+        <div>
+          <header className="border-b border-border bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Operations, stock, content, and customer activity</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button asChild variant="outline"><Link to="/">View public site</Link></Button>
+                <Button variant="outline" onClick={() => void logout()}>Logout</Button>
+              </div>
+            </div>
+          </header>
+          <main className="p-6">
+            <Outlet />
+          </main>
         </div>
       </div>
     </div>
   );
-};
-
-export default AdminLayout;
+}

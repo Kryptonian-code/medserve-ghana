@@ -1,239 +1,239 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { FormEvent, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Search } from "lucide-react";
+import { apiRequest } from "@/lib/api";
+import type { Category, Product } from "@/lib/types";
+import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 
-const AdminProducts = () => {
+type ProductFormState = {
+  id?: number;
+  name: string;
+  brand: string;
+  sku: string;
+  price: string;
+  comparePrice: string;
+  categoryId: string;
+  dosageForm: string;
+  packSize: string;
+  stockQuantity: string;
+  description: string;
+  usageGuidance: string;
+  warnings: string;
+  tags: string;
+  prescriptionRequired: boolean;
+  isActive: boolean;
+  image?: File | null;
+};
+
+const emptyForm: ProductFormState = {
+  name: "",
+  brand: "",
+  sku: "",
+  price: "",
+  comparePrice: "",
+  categoryId: "",
+  dosageForm: "",
+  packSize: "",
+  stockQuantity: "0",
+  description: "",
+  usageGuidance: "",
+  warnings: "",
+  tags: "",
+  prescriptionRequired: false,
+  isActive: true,
+  image: null,
+};
+
+export function AdminProducts() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [editProduct, setEditProduct] = useState<any>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [form, setForm] = useState<ProductFormState>(emptyForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  const { data: products, refetch } = useQuery({
-    queryKey: ["admin-products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, categories(name)")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+  const { data: productsData } = useQuery({
+    queryKey: ["admin-products", search],
+    queryFn: () => apiRequest<{ products: Product[] }>(`/admin/products${search ? `?search=${encodeURIComponent(search)}` : ""}`),
   });
-
-  const { data: categories } = useQuery({
+  const { data: categoriesData } = useQuery({
     queryKey: ["admin-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
+    queryFn: () => apiRequest<{ categories: Category[] }>("/admin/categories"),
+  });
+
+  const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData?.categories]);
+  const products = useMemo(() => productsData?.products ?? [], [productsData?.products]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === "image") return;
+        payload.append(key, String(value ?? ""));
+      });
+      if (form.image) payload.append("image", form.image);
+      return editingId
+        ? apiRequest(`/admin/products/${editingId}`, { method: "PUT", body: Object.fromEntries(payload.entries()) })
+        : apiRequest("/admin/products", { method: "POST", rawBody: payload });
+    },
+    onSuccess: () => {
+      toast.success(editingId ? "Product updated successfully." : "Product added successfully.");
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      setForm(emptyForm);
+      setEditingId(null);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to save that product right now."),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest(`/admin/products/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast.success("Product deleted successfully.");
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     },
   });
 
-  const filtered = products?.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.brand?.toLowerCase().includes(search.toLowerCase())
+  const editProduct = (product: Product) => {
+    setEditingId(product.id);
+    setForm({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      sku: product.sku,
+      price: String(product.price),
+      comparePrice: product.comparePrice ? String(product.comparePrice) : "",
+      categoryId: product.categoryId ? String(product.categoryId) : "",
+      dosageForm: product.dosageForm || "",
+      packSize: product.packSize || "",
+      stockQuantity: String(product.stockQuantity),
+      description: product.description,
+      usageGuidance: product.usageGuidance,
+      warnings: product.warnings,
+      tags: product.tags.join(", "),
+      prescriptionRequired: product.prescriptionRequired,
+      isActive: product.isActive,
+      image: null,
+    });
+  };
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    saveMutation.mutate();
+  };
+
+  const inventorySummary = useMemo(
+    () => ({
+      active: products.filter((product) => product.isActive).length,
+      lowStock: products.filter((product) => product.stockStatus === "Low Stock").length,
+      prescriptionOnly: products.filter((product) => product.prescriptionRequired).length,
+    }),
+    [products]
   );
 
-  const handleSave = async (formData: FormData) => {
-    const name = formData.get("name") as string;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const payload = {
-      name,
-      slug,
-      brand: formData.get("brand") as string,
-      description: formData.get("description") as string,
-      usage_guidance: formData.get("usage_guidance") as string,
-      warnings: formData.get("warnings") as string,
-      price: parseFloat(formData.get("price") as string) || 0,
-      category_id: formData.get("category_id") as string || null,
-      requires_prescription: formData.get("requires_prescription") === "on",
-      in_stock: formData.get("in_stock") === "on",
-      stock_quantity: parseInt(formData.get("stock_quantity") as string) || 0,
-    };
-
-    try {
-      if (editProduct) {
-        const { error } = await supabase.from("products").update(payload).eq("id", editProduct.id);
-        if (error) throw error;
-        toast.success("Product updated successfully");
-      } else {
-        const { error } = await supabase.from("products").insert(payload);
-        if (error) throw error;
-        toast.success("Product added successfully");
-      }
-      setIsDialogOpen(false);
-      setEditProduct(null);
-      refetch();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save product");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to remove this product?")) return;
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      toast.error("Failed to delete product");
-    } else {
-      toast.success("Product removed");
-      refetch();
-    }
-  };
-
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Products</h1>
-          <p className="text-sm text-muted-foreground">{products?.length || 0} products in catalogue</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) setEditProduct(null); }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={() => setEditProduct(null)}>
-              <Plus className="h-4 w-4" /> Add Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{editProduct ? "Edit Product" : "Add New Product"}</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSave(new FormData(e.currentTarget));
-              }}
-              className="space-y-4"
-            >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Product name</label>
-                  <Input name="name" defaultValue={editProduct?.name} required />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Brand</label>
-                  <Input name="brand" defaultValue={editProduct?.brand} />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Price (GH₵)</label>
-                  <Input name="price" type="number" step="0.01" defaultValue={editProduct?.price} required />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Category</label>
-                  <select name="category_id" defaultValue={editProduct?.category_id || ""} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option value="">No category</option>
-                    {categories?.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Description</label>
-                <Textarea name="description" defaultValue={editProduct?.description} rows={3} />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Usage guidance</label>
-                <Textarea name="usage_guidance" defaultValue={editProduct?.usage_guidance} rows={2} />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Warnings</label>
-                <Textarea name="warnings" defaultValue={editProduct?.warnings} rows={2} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Stock quantity</label>
-                  <Input name="stock_quantity" type="number" defaultValue={editProduct?.stock_quantity || 0} />
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <input type="checkbox" name="in_stock" id="in_stock" defaultChecked={editProduct?.in_stock ?? true} className="h-4 w-4 rounded border-border" />
-                  <label htmlFor="in_stock" className="text-sm font-medium">In stock</label>
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <input type="checkbox" name="requires_prescription" id="rx" defaultChecked={editProduct?.requires_prescription} className="h-4 w-4 rounded border-border" />
-                  <label htmlFor="rx" className="text-sm font-medium">Requires prescription</label>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">{editProduct ? "Update Product" : "Add Product"}</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-8">
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Active products</p><p className="mt-2 text-3xl font-bold">{inventorySummary.active}</p></div>
+        <div className="rounded-3xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Low stock</p><p className="mt-2 text-3xl font-bold">{inventorySummary.lowStock}</p></div>
+        <div className="rounded-3xl border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Prescription-only</p><p className="mt-2 text-3xl font-bold">{inventorySummary.prescriptionOnly}</p></div>
       </div>
 
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
-      </div>
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-3xl border border-border bg-card p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Products</h1>
+              <p className="text-sm text-muted-foreground">Search, review stock, and manage live catalogue entries.</p>
+            </div>
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products or SKU" />
+            </div>
+          </div>
 
-      <div className="rounded-xl border border-border bg-card">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Product</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Price</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Stock</th>
-                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered?.map((p) => (
-                <tr key={p.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-foreground">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.brand}</div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{(p.categories as any)?.name || "—"}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">GH₵ {Number(p.price).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{p.stock_quantity}</td>
-                  <td className="px-4 py-3">
-                    {p.in_stock ? (
-                      <Badge className="bg-success/10 text-success hover:bg-success/20">In Stock</Badge>
-                    ) : (
-                      <Badge variant="destructive">Out of Stock</Badge>
-                    )}
-                    {p.requires_prescription && <Badge variant="secondary" className="ml-1">Rx</Badge>}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => { setEditProduct(p); setIsDialogOpen(true); }}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDelete(p.id)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="pb-3">Product</th>
+                  <th className="pb-3">Category</th>
+                  <th className="pb-3">Price</th>
+                  <th className="pb-3">Stock</th>
+                  <th className="pb-3">Status</th>
+                  <th className="pb-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id} className="border-b border-border last:border-0">
+                    <td className="py-4">
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-xs text-muted-foreground">{product.brand} • {product.sku}</div>
+                    </td>
+                    <td className="py-4 text-muted-foreground">{product.categoryName || "Unassigned"}</td>
+                    <td className="py-4">{formatCurrency(product.price)}</td>
+                    <td className="py-4">{product.stockQuantity}</td>
+                    <td className="py-4">{product.stockStatus}</td>
+                    <td className="py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => editProduct(product)}>Edit</Button>
+                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(product.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!products.length ? (
+              <div className="py-10 text-center">
+                <p className="text-lg font-medium">No products have been published yet.</p>
+                <p className="mt-2 text-muted-foreground">Add your first product to begin building the catalogue.</p>
+              </div>
+            ) : null}
+          </div>
         </div>
-        {(!filtered || filtered.length === 0) && (
-          <div className="p-10 text-center text-muted-foreground">No products found.</div>
-        )}
+
+        <form onSubmit={handleSubmit} className="rounded-3xl border border-border bg-card p-6">
+          <h2 className="text-xl font-semibold">{editingId ? "Edit product" : "Add product"}</h2>
+          <div className="mt-4 space-y-4">
+            <Input placeholder="Product name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+            <div className="grid grid-cols-2 gap-4">
+              <Input placeholder="Brand" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
+              <Input placeholder="SKU" value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input placeholder="Price" type="number" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required />
+              <Input placeholder="Compare price" type="number" value={form.comparePrice} onChange={(event) => setForm({ ...form, comparePrice: event.target.value })} />
+            </div>
+            <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
+              <option value="">Select category</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+            <div className="grid grid-cols-2 gap-4">
+              <Input placeholder="Dosage form" value={form.dosageForm} onChange={(event) => setForm({ ...form, dosageForm: event.target.value })} />
+              <Input placeholder="Pack size" value={form.packSize} onChange={(event) => setForm({ ...form, packSize: event.target.value })} />
+            </div>
+            <Input placeholder="Stock quantity" type="number" value={form.stockQuantity} onChange={(event) => setForm({ ...form, stockQuantity: event.target.value })} />
+            <Input placeholder="Tags, separated by commas" value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} />
+            <Textarea placeholder="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} />
+            <Textarea placeholder="Usage guidance" value={form.usageGuidance} onChange={(event) => setForm({ ...form, usageGuidance: event.target.value })} rows={3} />
+            <Textarea placeholder="Warnings" value={form.warnings} onChange={(event) => setForm({ ...form, warnings: event.target.value })} rows={3} />
+            <Input type="file" accept=".jpg,.jpeg,.png" onChange={(event) => setForm({ ...form, image: event.target.files?.[0] || null })} />
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={form.prescriptionRequired} onChange={(event) => setForm({ ...form, prescriptionRequired: event.target.checked })} /> Prescription required</label>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /> Active</label>
+            </div>
+            <div className="flex gap-3">
+              <Button className="flex-1" disabled={saveMutation.isPending}>{saveMutation.isPending ? "Saving..." : editingId ? "Save changes" : "Add product"}</Button>
+              {editingId ? <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel</Button> : null}
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
-};
-
-export { AdminProducts };
+}

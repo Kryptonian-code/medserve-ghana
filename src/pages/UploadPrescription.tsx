@@ -1,27 +1,74 @@
+import { FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { CheckCircle, Upload } from "lucide-react";
 import PublicLayout from "@/components/layout/PublicLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, FileText, CheckCircle } from "lucide-react";
-import { useState } from "react";
+import { apiRequest } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-const UploadPrescription = () => {
+export default function UploadPrescription() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    patientName: user ? `${user.first_name} ${user.last_name}` : "",
+    phone: user?.phone || "",
+    fulfilmentType: "delivery",
+    notes: "",
+  });
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!user) {
+      navigate("/login", { state: { from: "/upload-prescription" } });
+      return;
+    }
+
+    if (!file) {
+      toast.error("Please upload a prescription file before submitting.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = new FormData();
+      payload.append("patientName", form.patientName);
+      payload.append("phone", form.phone);
+      payload.append("fulfilmentType", form.fulfilmentType);
+      payload.append("notes", form.notes);
+      payload.append("file", file);
+      await apiRequest("/prescriptions", { method: "POST", rawBody: payload });
+      toast.success("Prescription submitted successfully.");
+      setSubmitted(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to complete that action right now. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (submitted) {
     return (
       <PublicLayout>
         <section className="py-20">
           <div className="container">
-            <div className="mx-auto max-w-lg text-center">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-success/10">
-                <CheckCircle className="h-10 w-10 text-success" />
+            <div className="mx-auto max-w-lg rounded-3xl border border-border bg-card p-10 text-center">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <CheckCircle className="h-8 w-8 text-primary" />
               </div>
-              <h1 className="mb-4 text-3xl font-bold text-foreground">Prescription submitted successfully</h1>
-              <p className="mb-8 text-muted-foreground">
-                Our pharmacist will review your prescription shortly. You will receive a notification once your order is ready for payment.
+              <h1 className="text-3xl font-bold">Prescription submitted successfully</h1>
+              <p className="mt-3 text-muted-foreground">
+                Your file is now in the pharmacist review queue. We will update your account as soon as the review is complete.
               </p>
-              <Button onClick={() => setSubmitted(false)}>Upload Another Prescription</Button>
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <Button asChild><Link to="/account/prescriptions">View prescriptions</Link></Button>
+                <Button variant="outline" onClick={() => setSubmitted(false)}>Upload another file</Button>
+              </div>
             </div>
           </div>
         </section>
@@ -31,73 +78,70 @@ const UploadPrescription = () => {
 
   return (
     <PublicLayout>
-      <section className="py-12 md:py-20">
+      <section className="py-12 md:py-18">
         <div className="container">
-          <div className="mx-auto max-w-2xl">
-            <div className="mb-8 text-center">
-              <h1 className="mb-4 text-3xl font-bold text-foreground md:text-4xl">Upload your prescription</h1>
-              <p className="text-lg text-muted-foreground">
-                Send us a clear photo or scan of your prescription. Our licensed pharmacist will review it 
-                and prepare your medicines for delivery or pickup.
-              </p>
+          <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-8 shadow-sm">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold">Upload a prescription for pharmacist review</h1>
+              <p className="mt-2 text-muted-foreground">Send a clear image or PDF. We review prescriptions throughout the day and contact you if clarification is needed.</p>
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-6 md:p-8">
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-foreground">Prescription file</label>
-                <div className="flex items-center justify-center rounded-lg border-2 border-dashed border-border bg-background p-10 transition-colors hover:border-primary/50">
-                  <div className="text-center">
-                    <Upload className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                    <p className="mb-1 text-sm font-medium text-foreground">
-                      Drag and drop your file here, or click to browse
-                    </p>
-                    <p className="text-xs text-muted-foreground">Supports JPG, PNG, and PDF up to 10 MB</p>
-                  </div>
-                </div>
+            {!user ? (
+              <div className="mb-8 rounded-2xl bg-secondary p-4 text-sm text-muted-foreground">
+                Please sign in before submitting a prescription so we can attach the review to your account.
               </div>
+            ) : null}
 
-              <div className="mb-6 grid gap-4 sm:grid-cols-2">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <label className="block rounded-3xl border-2 border-dashed border-border bg-secondary/40 p-8 text-center">
+                <Upload className="mx-auto h-9 w-9 text-primary" />
+                <p className="mt-3 font-medium">{file ? file.name : "Choose a prescription file"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">JPG, PNG, or PDF up to 10MB</p>
+                <input type="file" className="hidden" accept=".jpg,.jpeg,.png,.pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">Full name</label>
-                  <Input placeholder="Enter your full name" />
+                  <label className="mb-2 block text-sm font-medium">Patient name</label>
+                  <Input value={form.patientName} onChange={(event) => setForm({ ...form, patientName: event.target.value })} placeholder="Enter the patient's full name" required />
                 </div>
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">Phone number</label>
-                  <Input placeholder="e.g. 024 123 4567" />
+                  <label className="mb-2 block text-sm font-medium">Phone number</label>
+                  <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="024 123 4567" required />
                 </div>
               </div>
 
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-foreground">Additional notes (optional)</label>
-                <Textarea placeholder="Let us know if you have specific requirements, preferred brands, or any allergies." rows={3} />
+              <div>
+                <label className="mb-2 block text-sm font-medium">Additional notes</label>
+                <Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Share any brand preferences, allergies, or questions for the pharmacist." rows={4} />
               </div>
 
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-foreground">Preferred fulfilment</label>
+              <div>
+                <label className="mb-2 block text-sm font-medium">Preferred fulfilment</label>
                 <div className="flex gap-3">
-                  <button className="flex-1 rounded-lg border-2 border-primary bg-primary/5 p-3 text-center text-sm font-medium text-foreground">
-                    Delivery
-                  </button>
-                  <button className="flex-1 rounded-lg border border-border p-3 text-center text-sm font-medium text-muted-foreground hover:border-primary/30">
-                    Pickup
-                  </button>
+                  {[
+                    { label: "Delivery", value: "delivery" },
+                    { label: "Pickup", value: "pickup" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`flex-1 rounded-2xl border px-4 py-3 text-sm ${form.fulfilmentType === option.value ? "border-primary bg-primary/5 text-foreground" : "border-border bg-background text-muted-foreground"}`}
+                      onClick={() => setForm({ ...form, fulfilmentType: option.value })}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <Button className="w-full" size="lg" onClick={() => setSubmitted(true)}>
-                <FileText className="mr-2 h-4 w-4" />
-                Submit Prescription
+              <Button size="lg" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting prescription..." : "Submit prescription"}
               </Button>
-
-              <p className="mt-4 text-center text-xs text-muted-foreground">
-                Your prescription is reviewed by a licensed pharmacist. We will contact you if we need any clarification.
-              </p>
-            </div>
+            </form>
           </div>
         </div>
       </section>
     </PublicLayout>
   );
-};
-
-export default UploadPrescription;
+}

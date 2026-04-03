@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react";
 
 export interface CartItem {
   id: string;
@@ -24,6 +24,18 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+function readStoredCart(): CartItem[] {
+  try {
+    const saved = window.localStorage.getItem("medserve-cart");
+    if (!saved) return [];
+
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export const useCart = () => {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useCart must be used within CartProvider");
@@ -31,8 +43,16 @@ export const useCart = () => {
 };
 
 export const CartProvider = ({ children }: { children: ReactNode }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(readStoredCart);
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("medserve-cart", JSON.stringify(items));
+    } catch {
+      // Ignore storage write failures so the UI stays usable.
+    }
+  }, [items]);
 
   const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
