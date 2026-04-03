@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 coverage
+.cache/
+.vite/
+.turbo/
 
 # Editor directories and files
 .vscode/*
@@ -23,6 +26,7 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
 # Environment files
 .env
@@ -39,7 +43,19 @@ backend/storage/
 uploads/
 backend/uploads/
 
+# Test and browser automation output
+playwright-report/
+test-results/
+.playwright/
+blob-report/
+htmlcov/
+
 # Local OS and temp files
 Thumbs.db
 *.tmp
 *.temp
+Desktop.ini
+
+# Package manager and archive artifacts
+*.tgz
+*.zip
