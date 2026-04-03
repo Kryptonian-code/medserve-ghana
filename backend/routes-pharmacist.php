@@ -76,6 +76,7 @@ if ($path === '/api/pharmacist/notes' && $method === 'POST') {
         ':created_at' => medserve_now(),
     ]);
 
+    medserve_bump_revisions($medservePdo, ['pharmacist', 'admin']);
     medserve_json(['message' => 'Note saved successfully.'], 201);
 }
 
@@ -94,5 +95,6 @@ if (preg_match('#^/api/pharmacist/prescriptions/(\d+)$#', $path, $matches) && $m
         ':id' => (int) $matches[1],
     ]);
 
+    medserve_bump_revisions($medservePdo, ['customer', 'pharmacist', 'admin']);
     medserve_json(['message' => 'Prescription updated successfully.']);
 }

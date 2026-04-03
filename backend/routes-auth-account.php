@@ -137,6 +137,7 @@ if ($path === '/api/account/profile' && $method === 'PUT') {
         ':id' => $user['id'],
     ]);
 
+    medserve_bump_revisions($medservePdo, ['customer']);
     medserve_json(['message' => 'Changes saved successfully.', 'user' => medserve_current_user($medservePdo)]);
 }
 
@@ -180,6 +181,7 @@ if ($path === '/api/account/addresses' && $method === 'POST') {
         ':updated_at' => $timestamp,
     ]);
 
+    medserve_bump_revisions($medservePdo, ['customer']);
     medserve_json(['message' => 'Address saved successfully.'], 201);
 }
 
@@ -212,12 +214,14 @@ if (preg_match('#^/api/account/addresses/(\d+)$#', $path, $matches) && $method =
         ':id' => $id,
     ]);
 
+    medserve_bump_revisions($medservePdo, ['customer']);
     medserve_json(['message' => 'Address updated successfully.']);
 }
 
 if (preg_match('#^/api/account/addresses/(\d+)$#', $path, $matches) && $method === 'DELETE') {
     $user = medserve_require_auth($medservePdo);
     $medservePdo->prepare('DELETE FROM addresses WHERE id = :id AND user_id = :user_id')->execute([':id' => (int) $matches[1], ':user_id' => $user['id']]);
+    medserve_bump_revisions($medservePdo, ['customer']);
     medserve_json(['message' => 'Address deleted successfully.']);
 }
 
@@ -284,6 +288,7 @@ if ($path === '/api/orders' && $method === 'POST') {
         ]);
     }
 
+    medserve_bump_revisions($medservePdo, ['customer', 'admin']);
     medserve_json(['message' => 'Order placed successfully.', 'orderId' => $orderId], 201);
 }
 
@@ -318,5 +323,6 @@ if ($path === '/api/prescriptions' && $method === 'POST') {
         ':updated_at' => $timestamp,
     ]);
 
+    medserve_bump_revisions($medservePdo, ['customer', 'pharmacist', 'admin']);
     medserve_json(['message' => 'Prescription submitted successfully.'], 201);
 }

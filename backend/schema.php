@@ -137,5 +137,11 @@ CREATE TABLE IF NOT EXISTS cms_sections (
     value_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS system_revisions (
+    revision_key TEXT PRIMARY KEY,
+    revision INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
 SQL);
 }

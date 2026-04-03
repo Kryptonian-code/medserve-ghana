@@ -80,6 +80,7 @@ if ($path === '/api/admin/products' && $method === 'POST') {
         ':updated_at' => $timestamp,
     ]);
 
+    medserve_bump_revisions($medservePdo, ['public', 'customer', 'admin']);
     medserve_json(['message' => 'Product added successfully.'], 201);
 }
 
@@ -113,12 +114,14 @@ if (preg_match('#^/api/admin/products/(\d+)$#', $path, $matches) && $method === 
         ':id' => (int) $matches[1],
     ]);
 
+    medserve_bump_revisions($medservePdo, ['public', 'customer', 'admin']);
     medserve_json(['message' => 'Product updated successfully.']);
 }
 
 if (preg_match('#^/api/admin/products/(\d+)$#', $path, $matches) && $method === 'DELETE') {
     medserve_require_permission($medservePdo, 'products.delete');
     $medservePdo->prepare('DELETE FROM products WHERE id = :id')->execute([':id' => (int) $matches[1]]);
+    medserve_bump_revisions($medservePdo, ['public', 'customer', 'admin']);
     medserve_json(['message' => 'Product deleted successfully.']);
 }
 
@@ -149,6 +152,7 @@ if ($path === '/api/admin/categories' && $method === 'POST') {
         ':updated_at' => $timestamp,
     ]);
 
+    medserve_bump_revisions($medservePdo, ['public', 'admin']);
     medserve_json(['message' => 'Category published successfully.'], 201);
 }
 
@@ -167,12 +171,14 @@ if (preg_match('#^/api/admin/categories/(\d+)$#', $path, $matches) && $method ==
         ':id' => (int) $matches[1],
     ]);
 
+    medserve_bump_revisions($medservePdo, ['public', 'admin']);
     medserve_json(['message' => 'Category updated successfully.']);
 }
 
 if (preg_match('#^/api/admin/categories/(\d+)$#', $path, $matches) && $method === 'DELETE') {
     medserve_require_permission($medservePdo, 'categories.delete');
     $medservePdo->prepare('DELETE FROM categories WHERE id = :id')->execute([':id' => (int) $matches[1]]);
+    medserve_bump_revisions($medservePdo, ['public', 'admin']);
     medserve_json(['message' => 'Category deleted successfully.']);
 }
 
@@ -202,6 +208,7 @@ if (preg_match('#^/api/admin/orders/(\d+)$#', $path, $matches) && $method === 'P
         ':updated_at' => medserve_now(),
         ':id' => (int) $matches[1],
     ]);
+    medserve_bump_revisions($medservePdo, ['customer', 'admin']);
     medserve_json(['message' => 'Order status updated successfully.']);
 }
 
@@ -221,6 +228,7 @@ if (preg_match('#^/api/admin/prescriptions/(\d+)$#', $path, $matches) && $method
         ':updated_at' => medserve_now(),
         ':id' => (int) $matches[1],
     ]);
+    medserve_bump_revisions($medservePdo, ['customer', 'pharmacist', 'admin']);
     medserve_json(['message' => 'Prescription updated successfully.']);
 }
 
@@ -265,6 +273,7 @@ if (preg_match('#^/api/admin/content/([^/]+)$#', $path, $matches) && $method ===
         ':updated_at' => medserve_now(),
         ':section_key' => $matches[1],
     ]);
+    medserve_bump_revisions($medservePdo, ['public', 'admin']);
     medserve_json(['message' => 'Content updated successfully.']);
 }
 

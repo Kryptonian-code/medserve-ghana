@@ -19,6 +19,13 @@ if (str_starts_with($path, '/files/')) {
     exit;
 }
 
+if ($path === '/api/sync/revisions' && $method === 'GET') {
+    medserve_json([
+        'revisions' => medserve_get_revisions($medservePdo),
+        'serverTime' => medserve_now(),
+    ]);
+}
+
 if ($path === '/api/bootstrap' && $method === 'GET') {
     $categories = medserve_query_all($medservePdo, 'SELECT c.*, COUNT(p.id) AS product_count FROM categories c LEFT JOIN products p ON p.category_id = c.id AND p.is_active = 1 GROUP BY c.id ORDER BY c.sort_order ASC');
     $featured = medserve_query_all($medservePdo, 'SELECT p.*, c.name AS category_name, c.slug AS category_slug FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.is_active = 1 ORDER BY p.stock_quantity DESC, p.created_at DESC LIMIT 6');

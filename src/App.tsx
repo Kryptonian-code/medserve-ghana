@@ -7,6 +7,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import CartDrawer from "@/components/cart/CartDrawer";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useLiveSync } from "@/hooks/use-live-sync";
 
 import Index from "./pages/Index";
 import Shop from "./pages/Shop";
@@ -41,11 +42,17 @@ import {
 
 const queryClient = new QueryClient();
 
+function LiveSyncBridge() {
+  useLiveSync();
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
         <CartProvider>
+          <LiveSyncBridge />
           <Toaster />
           <Sonner />
           <CartDrawer />

@@ -393,6 +393,64 @@ function medserve_cms(PDO $pdo, string $key): array
     return $row ? (json_decode($row['value_json'], true) ?? []) : [];
 }
 
+function medserve_revision_keys(): array
+{
+    return ['public', 'customer', 'pharmacist', 'admin'];
+}
+
+function medserve_ensure_revisions(PDO $pdo): void
+{
+    $stmt = $pdo->prepare('INSERT OR IGNORE INTO system_revisions (revision_key, revision, updated_at) VALUES (:revision_key, 0, :updated_at)');
+    $timestamp = medserve_now();
+    foreach (medserve_revision_keys() as $key) {
+        $stmt->execute([
+            ':revision_key' => $key,
+            ':updated_at' => $timestamp,
+        ]);
+    }
+}
+
+function medserve_get_revisions(PDO $pdo): array
+{
+    medserve_ensure_revisions($pdo);
+    $rows = medserve_query_all($pdo, 'SELECT revision_key, revision, updated_at FROM system_revisions');
+    $revisions = [];
+
+    foreach ($rows as $row) {
+        $revisions[$row['revision_key']] = [
+            'revision' => (int) $row['revision'],
+            'updatedAt' => $row['updated_at'],
+        ];
+    }
+
+    foreach (medserve_revision_keys() as $key) {
+        $revisions[$key] ??= [
+            'revision' => 0,
+            'updatedAt' => medserve_now(),
+        ];
+    }
+
+    return $revisions;
+}
+
+function medserve_bump_revisions(PDO $pdo, array $keys): void
+{
+    medserve_ensure_revisions($pdo);
+    $stmt = $pdo->prepare('UPDATE system_revisions SET revision = revision + 1, updated_at = :updated_at WHERE revision_key = :revision_key');
+    $timestamp = medserve_now();
+
+    foreach (array_unique($keys) as $key) {
+        if (!in_array($key, medserve_revision_keys(), true)) {
+            continue;
+        }
+
+        $stmt->execute([
+            ':updated_at' => $timestamp,
+            ':revision_key' => $key,
+        ]);
+    }
+}
+
 function medserve_save_upload(string $field, string $type): ?string
 {
     if (!isset($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
