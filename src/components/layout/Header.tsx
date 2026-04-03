@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X, ShoppingCart, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCart } from "@/contexts/CartContext";
 
 const publicNav = [
   { label: "Home", to: "/" },
@@ -14,11 +15,11 @@ const publicNav = [
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { setIsOpen, itemCount } = useCart();
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
         <Link to="/" className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
             <span className="text-lg font-bold text-primary-foreground">M</span>
@@ -28,7 +29,6 @@ const Header = () => {
           </span>
         </Link>
 
-        {/* Desktop Nav */}
         <nav className="hidden items-center gap-1 lg:flex">
           {publicNav.map((item) => (
             <Link
@@ -41,13 +41,15 @@ const Header = () => {
           ))}
         </nav>
 
-        {/* Desktop Actions */}
         <div className="hidden items-center gap-2 lg:flex">
-          <Link to="/shop">
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <ShoppingCart className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" className="relative text-muted-foreground" onClick={() => setIsOpen(true)}>
+            <ShoppingCart className="h-5 w-5" />
+            {itemCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {itemCount}
+              </span>
+            )}
+          </Button>
           <Link to="/login">
             <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
               <User className="h-4 w-4" />
@@ -59,17 +61,21 @@ const Header = () => {
           </Link>
         </div>
 
-        {/* Mobile Toggle */}
-        <button
-          className="lg:hidden"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <Button variant="ghost" size="icon" className="relative text-muted-foreground" onClick={() => setIsOpen(true)}>
+            <ShoppingCart className="h-5 w-5" />
+            {itemCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {itemCount}
+              </span>
+            )}
+          </Button>
+          <button onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile Menu */}
       {mobileOpen && (
         <div className="border-t border-border bg-card lg:hidden">
           <nav className="container flex flex-col gap-1 py-4">

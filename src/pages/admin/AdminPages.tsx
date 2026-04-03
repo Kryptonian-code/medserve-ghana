@@ -8,7 +8,7 @@ const AdminPlaceholder = ({ title }: { title: string }) => (
   </div>
 );
 
-export const AdminProducts = () => <AdminPlaceholder title="Products" />;
+// AdminProducts moved to AdminProductsPage.tsx
 export const AdminCategories = () => <AdminPlaceholder title="Categories" />;
 export const AdminOrders = () => <AdminPlaceholder title="Orders" />;
 export const AdminPrescriptions = () => <AdminPlaceholder title="Prescriptions" />;
