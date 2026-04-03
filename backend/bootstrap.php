@@ -15,7 +15,7 @@ const MEDSERVE_ROLE_PERMISSIONS = [
         'inventory.view',
         'content.view', 'content.update',
         'reports.view',
-        'users.view',
+        'users.view', 'users.update',
     ],
     'manager' => [
         'dashboard.view',

@@ -39,6 +39,8 @@ if ($path === '/api/bootstrap' && $method === 'GET') {
         'systemText' => medserve_cms($medservePdo, 'system-text'),
         'homepage' => medserve_cms($medservePdo, 'homepage'),
         'faq' => medserve_cms($medservePdo, 'faq'),
+        'contactPage' => medserve_cms($medservePdo, 'contact-page'),
+        'footer' => medserve_cms($medservePdo, 'footer'),
         'categories' => array_map('medserve_format_category', $categories),
         'featuredProducts' => array_map('medserve_format_product', $featured),
     ]);

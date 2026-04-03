@@ -4,6 +4,7 @@ import { useBootstrap } from "@/hooks/use-bootstrap";
 export default function HowItWorks() {
   const { data } = useBootstrap();
   const steps = data?.homepage?.howItWorks || [];
+  const emptyState = data?.systemText?.emptyStates?.howItWorks;
 
   return (
     <PublicLayout>
@@ -23,8 +24,8 @@ export default function HowItWorks() {
             ))}
             {!steps.length ? (
               <div className="rounded-3xl border border-dashed border-border bg-card p-6 md:col-span-3">
-                <h2 className="text-xl font-semibold">Ordering guidance will appear here soon.</h2>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground">Check back shortly for a step-by-step guide to shopping, prescription review, payment, and delivery.</p>
+                <h2 className="text-xl font-semibold">{emptyState?.title || "Ordering guidance will appear here soon."}</h2>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{emptyState?.description || "Check back shortly for a step-by-step guide to shopping, prescription review, payment, and delivery."}</p>
               </div>
             ) : null}
           </div>

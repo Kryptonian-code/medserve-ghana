@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/api";
-import type { BootstrapData, Category, Order, Prescription } from "@/lib/types";
+import { rolePermissions } from "@/lib/permissions";
+import type { BootstrapData, Category, Order, Prescription, UserRole } from "@/lib/types";
 import { ORDER_STATUSES, PRESCRIPTION_STATUSES, formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -36,6 +37,19 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 type AdminSection = { key: string; value: unknown };
 type FaqItem = { question: string; answer: string };
 type HomepageBlockItem = { title: string; description: string };
+type EmptyStateValue = { title: string; description: string };
+
+const userRoleOptions: Array<{ value: UserRole; label: string }> = [
+  { value: "customer", label: "Customer" },
+  { value: "pharmacist", label: "Pharmacist" },
+  { value: "editor", label: "Editor" },
+  { value: "support_staff", label: "Support Staff" },
+  { value: "finance_manager", label: "Finance Manager" },
+  { value: "content_manager", label: "Content Manager" },
+  { value: "manager", label: "Manager" },
+  { value: "admin", label: "Admin" },
+  { value: "super_admin", label: "Super Admin" },
+];
 
 function toLines(items?: string[]) {
   return (items || []).join("\n");
@@ -53,6 +67,24 @@ function buildHomepageItems(items: HomepageBlockItem[] | undefined, count: numbe
     title: items?.[index]?.title || "",
     description: items?.[index]?.description || "",
   }));
+}
+
+function buildEmptyState(value?: EmptyStateValue): EmptyStateValue {
+  return {
+    title: value?.title || "",
+    description: value?.description || "",
+  };
+}
+
+function permissionLabel(permission: string) {
+  return permission
+    .replace(".view_own", " own records")
+    .replace(".view", " view")
+    .replace(".create", " create")
+    .replace(".update", " update")
+    .replace(".delete", " delete")
+    .replace(".manage", " manage")
+    .replace(/\./g, " ");
 }
 
 function useAdminContentSections() {
@@ -150,10 +182,17 @@ export function AdminCategories() {
 
 export function AdminOrders() {
   const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { data } = useQuery({
-    queryKey: ["admin-orders", statusFilter],
-    queryFn: () => apiRequest<{ orders: Order[] }>(`/admin/orders${statusFilter !== "all" ? `?status=${encodeURIComponent(statusFilter)}` : ""}`),
+    queryKey: ["admin-orders", statusFilter, search],
+    queryFn: () => {
+      const queryString = new URLSearchParams({
+        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+        ...(search.trim() ? { search: search.trim() } : {}),
+      }).toString();
+      return apiRequest<{ orders: Order[] }>(`/admin/orders${queryString ? `?${queryString}` : ""}`);
+    },
   });
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => apiRequest(`/admin/orders/${id}`, { method: "PUT", body: { status } }),
@@ -166,14 +205,15 @@ export function AdminOrders() {
   return (
     <div>
       <SectionHeader title="Orders" description="Review order flow and keep fulfilment statuses accurate." />
-      <div className="mb-4 max-w-sm">
+      <div className="mb-4 grid gap-4 md:max-w-4xl md:grid-cols-[1.2fr_0.8fr]">
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by order number or customer name" />
         <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
           <option value="all">All statuses</option>
           {ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
         </select>
       </div>
       <div className="space-y-4">
-        {(data?.orders || []).map((order) => (
+        {(data?.orders || []).length ? (data?.orders || []).map((order) => (
           <div key={order.id} className="rounded-3xl border border-border bg-card p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -191,7 +231,12 @@ export function AdminOrders() {
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
+            <p className="text-lg font-medium">There are no orders matching those filters right now.</p>
+            <p className="mt-2 text-muted-foreground">Try another status or search term to see more order activity.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -232,37 +277,65 @@ export function AdminPrescriptions() {
 }
 
 export function AdminCustomers() {
+  const [search, setSearch] = useState("");
   const { data } = useQuery({
-    queryKey: ["admin-customers"],
-    queryFn: () => apiRequest<{ customers: Array<{ id: number; first_name: string; last_name: string; email: string; phone: string; created_at: string }> }>("/admin/customers"),
+    queryKey: ["admin-customers", search],
+    queryFn: () => apiRequest<{ customers: Array<{ id: number; first_name: string; last_name: string; email: string; phone: string; created_at: string }> }>(`/admin/customers${search.trim() ? `?search=${encodeURIComponent(search.trim())}` : ""}`),
   });
   return (
     <div>
       <SectionHeader title="Customers" description="Search active customer records and recent signups." />
+      <div className="mb-4 max-w-xl">
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by customer name or email address" />
+      </div>
       <div className="space-y-4">
-        {(data?.customers || []).map((customer) => (
+        {(data?.customers || []).length ? (data?.customers || []).map((customer) => (
           <div key={customer.id} className="rounded-3xl border border-border bg-card p-6">
             <h2 className="text-xl font-semibold">{customer.first_name} {customer.last_name}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{customer.email}</p>
             <p className="text-sm text-muted-foreground">{customer.phone}</p>
             <p className="mt-2 text-sm text-muted-foreground">Joined {formatDate(customer.created_at)}</p>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
+            <p className="text-lg font-medium">No customers matched that search.</p>
+            <p className="mt-2 text-muted-foreground">Try another name or email address to find the customer you need.</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 export function AdminInventory() {
+  const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState("all");
   const { data } = useQuery({
     queryKey: ["admin-inventory"],
     queryFn: () => apiRequest<{ inventory: Array<{ id: number; name: string; categoryName?: string; stockQuantity: number; stockStatus: string }> }>("/admin/inventory"),
   });
+  const items = useMemo(
+    () => (data?.inventory || []).filter((item) => {
+      const matchesSearch = !search.trim() || `${item.name} ${item.categoryName || ""}`.toLowerCase().includes(search.trim().toLowerCase());
+      const matchesStock = stockFilter === "all" || item.stockStatus === stockFilter;
+      return matchesSearch && matchesStock;
+    }),
+    [data?.inventory, search, stockFilter]
+  );
   return (
     <div>
       <SectionHeader title="Inventory" description="Monitor stock levels and product availability across the catalogue." />
+      <div className="mb-4 grid gap-4 md:max-w-4xl md:grid-cols-[1.2fr_0.8fr]">
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by medicine or category" />
+        <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
+          <option value="all">All stock levels</option>
+          <option value="In Stock">In Stock</option>
+          <option value="Low Stock">Low Stock</option>
+          <option value="Out of Stock">Out of Stock</option>
+        </select>
+      </div>
       <div className="space-y-4">
-        {(data?.inventory || []).map((item) => (
+        {items.length ? items.map((item) => (
           <div key={item.id} className="rounded-3xl border border-border bg-card p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -275,7 +348,12 @@ export function AdminInventory() {
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
+            <p className="text-lg font-medium">No inventory items matched those filters.</p>
+            <p className="mt-2 text-muted-foreground">Try another medicine name or stock level to review the catalogue.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -593,12 +671,27 @@ export function AdminSettings() {
   const { data } = useAdminContentSections();
   const saveNavigation = useSaveContentSection("navigation");
   const saveSeo = useSaveContentSection("seo");
+  const saveFooter = useSaveContentSection("footer");
+  const saveSystemText = useSaveContentSection("system-text");
+  const saveContactPage = useSaveContentSection("contact-page");
   const navigation = useMemo(
     () => data?.sections.find((item) => item.key === "navigation")?.value as Partial<BootstrapData["navigation"]> | undefined,
     [data?.sections]
   );
   const seo = useMemo(
     () => data?.sections.find((item) => item.key === "seo")?.value as Partial<BootstrapData["seo"]> | undefined,
+    [data?.sections]
+  );
+  const footer = useMemo(
+    () => data?.sections.find((item) => item.key === "footer")?.value as Partial<BootstrapData["footer"]> | undefined,
+    [data?.sections]
+  );
+  const systemText = useMemo(
+    () => data?.sections.find((item) => item.key === "system-text")?.value as Partial<BootstrapData["systemText"]> | undefined,
+    [data?.sections]
+  );
+  const contactPage = useMemo(
+    () => data?.sections.find((item) => item.key === "contact-page")?.value as NonNullable<BootstrapData["contactPage"]> | undefined,
     [data?.sections]
   );
   const [menuLabels, setMenuLabels] = useState({
@@ -614,6 +707,35 @@ export function AdminSettings() {
     prescriptionButton: "Upload Prescription",
   });
   const [seoForm, setSeoForm] = useState({ siteTitle: "", siteDescription: "", ogTitle: "", ogDescription: "" });
+  const [footerForm, setFooterForm] = useState({
+    tagline: "",
+    shop: "Shop",
+    categories: "Categories",
+    upload: "Upload Prescription",
+    howItWorks: "How It Works",
+    faq: "FAQ",
+    contact: "Contact",
+    policyOneLabel: "Privacy Policy",
+    policyOneLink: "/faq",
+    policyTwoLabel: "Terms and Conditions",
+    policyTwoLink: "/faq",
+    policyThreeLabel: "Delivery Information",
+    policyThreeLink: "/contact",
+  });
+  const [contactForm, setContactForm] = useState({
+    introTitle: "",
+    introDescription: "",
+    bestWaysTitle: "",
+    bestWaysBody: "",
+    urgentHelpTitle: "",
+    urgentHelpBody: "",
+  });
+  const [emptyStateForm, setEmptyStateForm] = useState({
+    accountOrders: buildEmptyState(),
+    accountPrescriptions: buildEmptyState(),
+    howItWorks: buildEmptyState(),
+    adminReports: buildEmptyState(),
+  });
 
   useEffect(() => {
     setMenuLabels({
@@ -634,7 +756,36 @@ export function AdminSettings() {
       ogTitle: seo?.ogTitle || "",
       ogDescription: seo?.ogDescription || "",
     });
-  }, [navigation, seo]);
+    setFooterForm({
+      tagline: footer?.tagline || "",
+      shop: navigation?.footerLinks?.[0]?.label || "Shop",
+      categories: navigation?.footerLinks?.[1]?.label || "Categories",
+      upload: navigation?.footerLinks?.[2]?.label || "Upload Prescription",
+      howItWorks: navigation?.footerLinks?.[3]?.label || "How It Works",
+      faq: navigation?.footerLinks?.[4]?.label || "FAQ",
+      contact: navigation?.footerLinks?.[5]?.label || "Contact",
+      policyOneLabel: navigation?.policyLinks?.[0]?.label || "Privacy Policy",
+      policyOneLink: navigation?.policyLinks?.[0]?.to || "/faq",
+      policyTwoLabel: navigation?.policyLinks?.[1]?.label || "Terms and Conditions",
+      policyTwoLink: navigation?.policyLinks?.[1]?.to || "/faq",
+      policyThreeLabel: navigation?.policyLinks?.[2]?.label || "Delivery Information",
+      policyThreeLink: navigation?.policyLinks?.[2]?.to || "/contact",
+    });
+    setContactForm({
+      introTitle: contactPage?.introTitle || "",
+      introDescription: contactPage?.introDescription || "",
+      bestWaysTitle: contactPage?.bestWaysTitle || "",
+      bestWaysBody: toLines(contactPage?.bestWaysBody),
+      urgentHelpTitle: contactPage?.urgentHelpTitle || "",
+      urgentHelpBody: toLines(contactPage?.urgentHelpBody),
+    });
+    setEmptyStateForm({
+      accountOrders: buildEmptyState(systemText?.emptyStates?.accountOrders),
+      accountPrescriptions: buildEmptyState(systemText?.emptyStates?.accountPrescriptions),
+      howItWorks: buildEmptyState(systemText?.emptyStates?.howItWorks),
+      adminReports: buildEmptyState(systemText?.emptyStates?.adminReports),
+    });
+  }, [navigation, seo, footer, systemText, contactPage]);
 
   return (
     <div className="grid gap-6">
@@ -690,6 +841,142 @@ export function AdminSettings() {
         className="grid gap-6"
         onSubmit={(event) => {
           event.preventDefault();
+          saveNavigation.mutate({
+            primaryLinks: navigation?.primaryLinks || [],
+            footerLinks: [
+              { label: footerForm.shop.trim(), to: "/shop" },
+              { label: footerForm.categories.trim(), to: "/shop" },
+              { label: footerForm.upload.trim(), to: "/upload-prescription" },
+              { label: footerForm.howItWorks.trim(), to: "/how-it-works" },
+              { label: footerForm.faq.trim(), to: "/faq" },
+              { label: footerForm.contact.trim(), to: "/contact" },
+            ],
+            policyLinks: [
+              { label: footerForm.policyOneLabel.trim(), to: footerForm.policyOneLink },
+              { label: footerForm.policyTwoLabel.trim(), to: footerForm.policyTwoLink },
+              { label: footerForm.policyThreeLabel.trim(), to: footerForm.policyThreeLink },
+            ].filter((item) => item.label),
+            primaryCtaLabel: navigation?.primaryCtaLabel || menuLabels.mainButton.trim(),
+            prescriptionCtaLabel: navigation?.prescriptionCtaLabel || menuLabels.prescriptionButton.trim(),
+            loginLabel: navigation?.loginLabel || menuLabels.login.trim(),
+          });
+          saveFooter.mutate({ tagline: footerForm.tagline.trim() });
+        }}
+      >
+        <FormPanel title="Footer and Policy Links" description="Control the footer message and quick links with simple labels.">
+          <Field label="Footer message"><Textarea value={footerForm.tagline} onChange={(event) => setFooterForm({ ...footerForm, tagline: event.target.value })} rows={3} /></Field>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Field label="Footer link: Shop"><Input value={footerForm.shop} onChange={(event) => setFooterForm({ ...footerForm, shop: event.target.value })} /></Field>
+            <Field label="Footer link: Categories"><Input value={footerForm.categories} onChange={(event) => setFooterForm({ ...footerForm, categories: event.target.value })} /></Field>
+            <Field label="Footer link: Upload Prescription"><Input value={footerForm.upload} onChange={(event) => setFooterForm({ ...footerForm, upload: event.target.value })} /></Field>
+            <Field label="Footer link: How It Works"><Input value={footerForm.howItWorks} onChange={(event) => setFooterForm({ ...footerForm, howItWorks: event.target.value })} /></Field>
+            <Field label="Footer link: FAQ"><Input value={footerForm.faq} onChange={(event) => setFooterForm({ ...footerForm, faq: event.target.value })} /></Field>
+            <Field label="Footer link: Contact"><Input value={footerForm.contact} onChange={(event) => setFooterForm({ ...footerForm, contact: event.target.value })} /></Field>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-3">
+            {([
+              ["policyOneLabel", "policyOneLink", "Policy link 1"],
+              ["policyTwoLabel", "policyTwoLink", "Policy link 2"],
+              ["policyThreeLabel", "policyThreeLink", "Policy link 3"],
+            ] as const).map(([labelKey, linkKey, heading]) => (
+              <div key={heading} className="rounded-2xl border border-border p-4">
+                <div className="mb-4 font-semibold">{heading}</div>
+                <div className="space-y-4">
+                  <Field label="Link label"><Input value={footerForm[labelKey]} onChange={(event) => setFooterForm({ ...footerForm, [labelKey]: event.target.value })} /></Field>
+                  <Field label="Open this page">
+                    <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={footerForm[linkKey]} onChange={(event) => setFooterForm({ ...footerForm, [linkKey]: event.target.value })}>
+                      <option value="/faq">FAQ</option>
+                      <option value="/contact">Contact</option>
+                      <option value="/how-it-works">How It Works</option>
+                      <option value="/shop">Shop</option>
+                      <option value="/upload-prescription">Upload Prescription</option>
+                    </select>
+                  </Field>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saveNavigation.isPending || saveFooter.isPending}>{saveNavigation.isPending || saveFooter.isPending ? "Saving changes..." : "Save Changes"}</Button>
+          </div>
+        </FormPanel>
+      </form>
+      <form
+        className="grid gap-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          saveContactPage.mutate({
+            introTitle: contactForm.introTitle.trim(),
+            introDescription: contactForm.introDescription.trim(),
+            bestWaysTitle: contactForm.bestWaysTitle.trim(),
+            bestWaysBody: fromLines(contactForm.bestWaysBody),
+            urgentHelpTitle: contactForm.urgentHelpTitle.trim(),
+            urgentHelpBody: fromLines(contactForm.urgentHelpBody),
+          });
+        }}
+      >
+        <FormPanel title="Contact Page Content" description="Update the guidance customers see on the public contact page.">
+          <Field label="Main contact heading"><Input value={contactForm.introTitle} onChange={(event) => setContactForm({ ...contactForm, introTitle: event.target.value })} /></Field>
+          <Field label="Main contact message"><Textarea value={contactForm.introDescription} onChange={(event) => setContactForm({ ...contactForm, introDescription: event.target.value })} rows={4} /></Field>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
+              <Field label="Help card heading"><Input value={contactForm.bestWaysTitle} onChange={(event) => setContactForm({ ...contactForm, bestWaysTitle: event.target.value })} /></Field>
+              <Field label="Help card points" hint="Add one short point per line."><Textarea value={contactForm.bestWaysBody} onChange={(event) => setContactForm({ ...contactForm, bestWaysBody: event.target.value })} rows={6} /></Field>
+            </div>
+            <div className="space-y-4">
+              <Field label="Urgent help card heading"><Input value={contactForm.urgentHelpTitle} onChange={(event) => setContactForm({ ...contactForm, urgentHelpTitle: event.target.value })} /></Field>
+              <Field label="Urgent help card lines" hint="Add one line per method or support note."><Textarea value={contactForm.urgentHelpBody} onChange={(event) => setContactForm({ ...contactForm, urgentHelpBody: event.target.value })} rows={6} /></Field>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saveContactPage.isPending}>{saveContactPage.isPending ? "Saving changes..." : "Save Changes"}</Button>
+          </div>
+        </FormPanel>
+      </form>
+      <form
+        className="grid gap-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          saveSystemText.mutate({
+            emptyStates: {
+              accountOrders: emptyStateForm.accountOrders,
+              accountPrescriptions: emptyStateForm.accountPrescriptions,
+              howItWorks: emptyStateForm.howItWorks,
+              adminReports: emptyStateForm.adminReports,
+            },
+          });
+        }}
+      >
+        <FormPanel title="Helpful Empty-State Messages" description="Set the messages people see when a page has no activity yet.">
+          <div className="grid gap-4 xl:grid-cols-2">
+            {([
+              ["accountOrders", "Customer orders"],
+              ["accountPrescriptions", "Customer prescriptions"],
+              ["howItWorks", "How it works page"],
+              ["adminReports", "Admin reports"],
+            ] as const).map(([key, heading]) => (
+              <div key={key} className="rounded-2xl border border-border p-4">
+                <div className="mb-4 font-semibold">{heading}</div>
+                <div className="space-y-4">
+                  <Field label="Empty-state title">
+                    <Input value={emptyStateForm[key].title} onChange={(event) => setEmptyStateForm((current) => ({ ...current, [key]: { ...current[key], title: event.target.value } }))} />
+                  </Field>
+                  <Field label="Empty-state message">
+                    <Textarea value={emptyStateForm[key].description} onChange={(event) => setEmptyStateForm((current) => ({ ...current, [key]: { ...current[key], description: event.target.value } }))} rows={4} />
+                  </Field>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saveSystemText.isPending}>{saveSystemText.isPending ? "Saving changes..." : "Save Changes"}</Button>
+          </div>
+        </FormPanel>
+      </form>
+      <form
+        className="grid gap-6"
+        onSubmit={(event) => {
+          event.preventDefault();
           saveSeo.mutate({
             siteTitle: seoForm.siteTitle.trim(),
             siteDescription: seoForm.siteDescription.trim(),
@@ -715,54 +1002,115 @@ export function AdminSettings() {
 }
 
 export function AdminUsers() {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
   const { data } = useQuery({
     queryKey: ["admin-users"],
-    queryFn: () => apiRequest<{ users: Array<{ id: number; first_name: string; last_name: string; email: string; role: string }> }>("/admin/users"),
+    queryFn: () => apiRequest<{ users: Array<{ id: number; first_name: string; last_name: string; email: string; role: UserRole }> }>("/admin/users"),
   });
+  const mutation = useMutation({
+    mutationFn: ({ id, role }: { id: number; role: UserRole }) => apiRequest(`/admin/users/${id}`, { method: "PUT", body: { role } }),
+    onSuccess: () => {
+      toast.success("User access updated successfully.");
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to update that access level right now."),
+  });
+  const users = useMemo(
+    () => (data?.users || []).filter((user) => !search.trim() || `${user.first_name} ${user.last_name} ${user.email}`.toLowerCase().includes(search.trim().toLowerCase())),
+    [data?.users, search]
+  );
   return (
     <div>
-      <SectionHeader title="Users and roles" description="Review system access across customer, pharmacist, and admin accounts." />
+      <SectionHeader title="Users" description="Review team access and change roles with simple dropdown controls." />
+      <div className="mb-4 max-w-xl">
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by staff member or customer email" />
+      </div>
       <div className="space-y-4">
-        {(data?.users || []).map((user) => (
+        {users.length ? users.map((user) => (
           <div key={user.id} className="rounded-3xl border border-border bg-card p-6">
-            <h2 className="text-xl font-semibold">{user.first_name} {user.last_name}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{user.role}</p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold">{user.first_name} {user.last_name}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
+              </div>
+              <div className="min-w-[220px]">
+                <Field label="Access level">
+                  <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={user.role} onChange={(event) => mutation.mutate({ id: user.id, role: event.target.value as UserRole })}>
+                    {userRoleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(rolePermissions[user.role] || []).slice(0, 8).map((permission) => (
+                <span key={permission} className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                  {permission === "*" ? "Full access" : permissionLabel(permission)}
+                </span>
+              ))}
+            </div>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
+            <p className="text-lg font-medium">No users matched that search.</p>
+            <p className="mt-2 text-muted-foreground">Try another name or email address to find the person you want.</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 export function AdminReports() {
+  const { data: contentData } = useAdminContentSections();
   const { data } = useQuery({
     queryKey: ["admin-reports"],
     queryFn: () => apiRequest<{ orderStatuses: Array<{ status: string; total: number }>; prescriptionStatuses: Array<{ status: string; total: number }> }>("/admin/reports"),
   });
+  const hasData = Boolean((data?.orderStatuses || []).length || (data?.prescriptionStatuses || []).length);
+  const emptyState = useMemo(
+    () => ((contentData?.sections.find((item) => item.key === "system-text")?.value as Partial<BootstrapData["systemText"]> | undefined)?.emptyStates?.adminReports),
+    [contentData?.sections]
+  );
   return (
     <div className="grid gap-6 xl:grid-cols-2">
       <div className="rounded-3xl border border-border bg-card p-6">
         <SectionHeader title="Reports" description="Status snapshots across live orders and prescriptions." />
-        <div className="space-y-3">
-          {(data?.orderStatuses || []).map((item) => (
-            <div key={item.status} className="flex items-center justify-between rounded-2xl bg-secondary p-4">
-              <span>{item.status}</span>
-              <span>{item.total}</span>
-            </div>
-          ))}
-        </div>
+        {hasData ? (
+          <div className="space-y-3">
+            {(data?.orderStatuses || []).map((item) => (
+              <div key={item.status} className="flex items-center justify-between rounded-2xl bg-secondary p-4">
+                <span>{item.status}</span>
+                <span>{item.total}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+            <p className="font-medium">{emptyState?.title || "There is not enough data to display this report yet."}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{emptyState?.description || "Activity will appear here as orders and prescriptions come in."}</p>
+          </div>
+        )}
       </div>
       <div className="rounded-3xl border border-border bg-card p-6">
         <SectionHeader title="Prescription statuses" description="Track how the review queue is moving over time." />
-        <div className="space-y-3">
-          {(data?.prescriptionStatuses || []).map((item) => (
-            <div key={item.status} className="flex items-center justify-between rounded-2xl bg-secondary p-4">
-              <span>{item.status}</span>
-              <span>{item.total}</span>
-            </div>
-          ))}
-        </div>
+        {hasData ? (
+          <div className="space-y-3">
+            {(data?.prescriptionStatuses || []).map((item) => (
+              <div key={item.status} className="flex items-center justify-between rounded-2xl bg-secondary p-4">
+                <span>{item.status}</span>
+                <span>{item.total}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+            <p className="font-medium">{emptyState?.title || "There is not enough data to display this report yet."}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{emptyState?.description || "Activity will appear here as orders and prescriptions come in."}</p>
+          </div>
+        )}
       </div>
     </div>
   );

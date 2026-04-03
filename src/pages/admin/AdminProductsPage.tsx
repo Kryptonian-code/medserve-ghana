@@ -144,12 +144,12 @@ export function AdminProducts() {
         <div className="rounded-3xl border border-border bg-card p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold">Products</h1>
-              <p className="text-sm text-muted-foreground">Search, review stock, and manage live catalogue entries.</p>
+              <h1 className="text-2xl font-bold">Medicines</h1>
+              <p className="text-sm text-muted-foreground">Search, review stock, and manage medicines in the live catalogue.</p>
             </div>
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search products or SKU" />
+              <Input className="pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search medicines by name, brand, or SKU" />
             </div>
           </div>
 
@@ -157,7 +157,7 @@ export function AdminProducts() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
-                  <th className="pb-3">Product</th>
+                  <th className="pb-3">Medicine</th>
                   <th className="pb-3">Category</th>
                   <th className="pb-3">Price</th>
                   <th className="pb-3">Stock</th>
@@ -198,9 +198,9 @@ export function AdminProducts() {
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-3xl border border-border bg-card p-6">
-          <h2 className="text-xl font-semibold">{editingId ? "Edit product" : "Add product"}</h2>
+          <h2 className="text-xl font-semibold">{editingId ? "Edit medicine" : "Add medicine"}</h2>
           <div className="mt-4 space-y-4">
-            <Input placeholder="Product name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+            <Input placeholder="Medicine name" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
             <div className="grid grid-cols-2 gap-4">
               <Input placeholder="Brand" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
               <Input placeholder="SKU" value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} />
@@ -210,7 +210,7 @@ export function AdminProducts() {
               <Input placeholder="Compare price" type="number" value={form.comparePrice} onChange={(event) => setForm({ ...form, comparePrice: event.target.value })} />
             </div>
             <select className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })}>
-              <option value="">Select category</option>
+              <option value="">Choose a category</option>
               {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
             <div className="grid grid-cols-2 gap-4">
@@ -228,7 +228,7 @@ export function AdminProducts() {
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /> Active</label>
             </div>
             <div className="flex gap-3">
-              <Button className="flex-1" disabled={saveMutation.isPending}>{saveMutation.isPending ? "Saving..." : editingId ? "Save changes" : "Add product"}</Button>
+              <Button className="flex-1" disabled={saveMutation.isPending}>{saveMutation.isPending ? "Saving..." : editingId ? "Save Changes" : "Add Medicine"}</Button>
               {editingId ? <Button type="button" variant="outline" onClick={() => { setEditingId(null); setForm(emptyForm); }}>Cancel</Button> : null}
             </div>
           </div>

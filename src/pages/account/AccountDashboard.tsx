@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { apiRequest } from "@/lib/api";
+import { useBootstrap } from "@/hooks/use-bootstrap";
 import type { Order, Prescription, Product } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 
@@ -19,10 +20,12 @@ type DashboardResponse = {
 };
 
 export default function AccountDashboard() {
+  const { data: bootstrap } = useBootstrap();
   const { data } = useQuery({
     queryKey: ["customer-dashboard"],
     queryFn: () => apiRequest<DashboardResponse>("/dashboard/customer"),
   });
+  const emptyState = bootstrap?.systemText?.emptyStates?.accountOrders;
 
   return (
     <div className="space-y-8">
@@ -74,8 +77,8 @@ export default function AccountDashboard() {
               </div>
             )) : (
               <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-                <p className="font-medium">You have not placed any orders yet.</p>
-                <p className="mt-2 text-sm text-muted-foreground">When you place your first order, it will appear here.</p>
+                <p className="font-medium">{emptyState?.title || "You have not placed any orders yet."}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{emptyState?.description || "When you place your first order, it will appear here."}</p>
               </div>
             )}
           </div>

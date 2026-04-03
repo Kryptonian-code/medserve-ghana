@@ -282,6 +282,39 @@ if ($path === '/api/admin/users' && $method === 'GET') {
     medserve_json(['users' => medserve_query_all($medservePdo, 'SELECT id, first_name, last_name, email, phone, role, created_at FROM users ORDER BY role ASC, created_at DESC')]);
 }
 
+if (preg_match('#^/api/admin/users/(\d+)$#', $path, $matches) && $method === 'PUT') {
+    $currentUser = medserve_require_permission($medservePdo, 'users.update');
+    $body = medserve_body();
+    $role = trim((string) ($body['role'] ?? ''));
+
+    $allowedRoles = ['customer', 'pharmacist', 'admin', 'manager', 'editor', 'support_staff', 'finance_manager', 'content_manager'];
+    if ($currentUser['role'] === 'super_admin') {
+        $allowedRoles[] = 'super_admin';
+    }
+
+    if (!in_array($role, $allowedRoles, true)) {
+        medserve_json(['error' => 'Please choose a valid access level.'], 422);
+    }
+
+    $userId = (int) $matches[1];
+    $targetUser = medserve_query_one($medservePdo, 'SELECT id, role FROM users WHERE id = :id', [':id' => $userId]);
+    if (!$targetUser) {
+        medserve_json(['error' => 'User not found.'], 404);
+    }
+
+    if ($targetUser['role'] === 'super_admin' && $currentUser['role'] !== 'super_admin') {
+        medserve_json(['error' => 'Only a super admin can change that access level.'], 403);
+    }
+
+    $medservePdo->prepare('UPDATE users SET role = :role WHERE id = :id')->execute([
+        ':role' => $role,
+        ':id' => $userId,
+    ]);
+
+    medserve_bump_revisions($medservePdo, ['admin']);
+    medserve_json(['message' => 'User access updated successfully.']);
+}
+
 if ($path === '/api/admin/reports' && $method === 'GET') {
     medserve_require_permission($medservePdo, 'reports.view');
     medserve_json([

@@ -159,8 +159,16 @@ export interface BootstrapData {
     businessHours: string[];
     deliveryNotice: string;
   };
+  contactPage?: {
+    introTitle?: string;
+    introDescription?: string;
+    bestWaysTitle?: string;
+    bestWaysBody?: string[];
+    urgentHelpTitle?: string;
+    urgentHelpBody?: string[];
+  };
   footer: {
-    policies: string[];
+    policies?: string[];
     tagline: string;
   };
   categories: Category[];

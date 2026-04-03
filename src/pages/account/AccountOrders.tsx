@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
+import { useBootstrap } from "@/hooks/use-bootstrap";
 import type { Order } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export default function AccountOrders() {
+  const { data: bootstrap } = useBootstrap();
   const { data } = useQuery({
     queryKey: ["account-orders"],
     queryFn: () => apiRequest<{ orders: Order[] }>("/account/orders"),
   });
+  const emptyState = bootstrap?.systemText?.emptyStates?.accountOrders;
 
   return (
     <div>
@@ -38,8 +41,8 @@ export default function AccountOrders() {
           </div>
         )) : (
           <div className="rounded-3xl border border-border bg-card p-10 text-center">
-            <p className="text-lg font-medium">You have not placed any orders yet.</p>
-            <p className="mt-2 text-muted-foreground">When you place your first order, it will appear here.</p>
+            <p className="text-lg font-medium">{emptyState?.title || "You have not placed any orders yet."}</p>
+            <p className="mt-2 text-muted-foreground">{emptyState?.description || "When you place your first order, it will appear here."}</p>
           </div>
         )}
       </div>

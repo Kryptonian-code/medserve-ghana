@@ -6,6 +6,7 @@ const Footer = () => {
   const { data } = useBootstrap();
   const site = data?.site;
   const navigation = data?.navigation;
+  const footer = data?.footer;
   const footerLinks = navigation?.footerLinks?.length
     ? navigation.footerLinks
     : [
@@ -31,7 +32,7 @@ const Footer = () => {
               <span className="font-heading text-lg font-bold">{site?.brandName || "MedServe Ghana"}</span>
             </div>
             <p className="text-sm leading-relaxed opacity-80">
-              {site?.tagline || "Online pharmacy support for everyday health and pharmacist-reviewed prescriptions."}
+              {footer?.tagline || site?.tagline || "Online pharmacy support for everyday health and pharmacist-reviewed prescriptions."}
             </p>
           </div>
 

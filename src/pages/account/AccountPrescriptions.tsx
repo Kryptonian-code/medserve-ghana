@@ -2,14 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api";
+import { useBootstrap } from "@/hooks/use-bootstrap";
 import type { Prescription } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 
 export default function AccountPrescriptions() {
+  const { data: bootstrap } = useBootstrap();
   const { data } = useQuery({
     queryKey: ["account-prescriptions"],
     queryFn: () => apiRequest<{ prescriptions: Prescription[] }>("/account/prescriptions"),
   });
+  const emptyState = bootstrap?.systemText?.emptyStates?.accountPrescriptions;
 
   return (
     <div>
@@ -43,8 +46,8 @@ export default function AccountPrescriptions() {
           </div>
         )) : (
           <div className="rounded-3xl border border-border bg-card p-10 text-center">
-            <p className="text-lg font-medium">You have not uploaded any prescriptions yet.</p>
-            <p className="mt-2 text-muted-foreground">Upload a prescription when you need pharmacist review.</p>
+            <p className="text-lg font-medium">{emptyState?.title || "You have not uploaded any prescriptions yet."}</p>
+            <p className="mt-2 text-muted-foreground">{emptyState?.description || "Upload a prescription when you need pharmacist review."}</p>
           </div>
         )}
       </div>
