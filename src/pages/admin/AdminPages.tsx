@@ -35,6 +35,7 @@ const Field = ({ label, hint, children }: { label: string; hint?: string; childr
 
 type AdminSection = { key: string; value: unknown };
 type FaqItem = { question: string; answer: string };
+type HomepageBlockItem = { title: string; description: string };
 
 function toLines(items?: string[]) {
   return (items || []).join("\n");
@@ -45,6 +46,13 @@ function fromLines(value: string) {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function buildHomepageItems(items: HomepageBlockItem[] | undefined, count: number) {
+  return Array.from({ length: count }, (_, index) => ({
+    title: items?.[index]?.title || "",
+    description: items?.[index]?.description || "",
+  }));
 }
 
 function useAdminContentSections() {
@@ -428,6 +436,8 @@ export function AdminHomepage() {
     statValue: "",
     trustIndicators: "",
     announcements: "",
+    benefits: buildHomepageItems(undefined, 4),
+    howItWorks: buildHomepageItems(undefined, 3),
   });
 
   useEffect(() => {
@@ -442,6 +452,8 @@ export function AdminHomepage() {
       statValue: section?.hero?.statValue || "",
       trustIndicators: toLines(section?.trustIndicators),
       announcements: toLines(section?.announcements),
+      benefits: buildHomepageItems(section?.benefits, 4),
+      howItWorks: buildHomepageItems(section?.howItWorks, 3),
     });
   }, [section]);
 
@@ -464,6 +476,12 @@ export function AdminHomepage() {
           },
           trustIndicators: fromLines(form.trustIndicators),
           announcements: fromLines(form.announcements),
+          benefits: form.benefits
+            .map((item) => ({ title: item.title.trim(), description: item.description.trim() }))
+            .filter((item) => item.title || item.description),
+          howItWorks: form.howItWorks
+            .map((item) => ({ title: item.title.trim(), description: item.description.trim() }))
+            .filter((item) => item.title || item.description),
         });
       }}
     >
@@ -485,6 +503,84 @@ export function AdminHomepage() {
       <FormPanel title="Trust Messages" description="Add one message per line for trust points and announcement cards.">
         <Field label="Trust points"><Textarea value={form.trustIndicators} onChange={(event) => setForm({ ...form, trustIndicators: event.target.value })} placeholder={"Genuine medicines sourced from trusted suppliers\nSecure checkout and protected prescription handling"} rows={5} /></Field>
         <Field label="Announcement cards"><Textarea value={form.announcements} onChange={(event) => setForm({ ...form, announcements: event.target.value })} placeholder={"Same-day review for prescriptions received during business hours.\nPrices and stock updates appear on the website automatically."} rows={5} /></Field>
+      </FormPanel>
+      <FormPanel title="Benefit Cards" description="These cards explain why customers should choose your pharmacy.">
+        <div className="grid gap-4 xl:grid-cols-2">
+          {form.benefits.map((benefit, index) => (
+            <div key={`benefit-${index}`} className="rounded-2xl border border-border p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold">Benefit card {index + 1}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Keep the title short and the supporting message clear.</p>
+              </div>
+              <div className="space-y-4">
+                <Field label="Card title">
+                  <Input
+                    value={benefit.title}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        benefits: current.benefits.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item),
+                      }))
+                    }
+                    placeholder="Pharmacist-reviewed prescriptions"
+                  />
+                </Field>
+                <Field label="Card description">
+                  <Textarea
+                    value={benefit.description}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        benefits: current.benefits.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item),
+                      }))
+                    }
+                    placeholder="Customers can upload prescriptions and receive clear guidance before checkout."
+                    rows={4}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+        </div>
+      </FormPanel>
+      <FormPanel title="How It Works Steps" description="Guide customers through the order or prescription process with short, clear steps.">
+        <div className="grid gap-4">
+          {form.howItWorks.map((step, index) => (
+            <div key={`homepage-step-${index}`} className="rounded-2xl border border-border p-4">
+              <div className="mb-4">
+                <h3 className="font-semibold">Step {index + 1}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">This appears on the public “How it works” page.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                <Field label="Step title">
+                  <Input
+                    value={step.title}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        howItWorks: current.howItWorks.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item),
+                      }))
+                    }
+                    placeholder="Upload your prescription"
+                  />
+                </Field>
+                <Field label="Step description">
+                  <Textarea
+                    value={step.description}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        howItWorks: current.howItWorks.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item),
+                      }))
+                    }
+                    placeholder="Send your prescription securely so the pharmacy team can review it and confirm what you need."
+                    rows={3}
+                  />
+                </Field>
+              </div>
+            </div>
+          ))}
+        </div>
       </FormPanel>
       <div className="flex justify-end">
         <Button type="submit" size="lg" disabled={saveMutation.isPending}>{saveMutation.isPending ? "Saving changes..." : "Save Changes"}</Button>
